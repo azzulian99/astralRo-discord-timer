@@ -1,14 +1,14 @@
-import random
+from random import choice, randint
 
-def handle_response (message) -> str:
-    p_message = message.lower()
+def get_response(user_input : str) -> str:
+    lowered: str = user_input.lower()
 
-    if p_message == 'hello':
-        return 'wassup bitch!'
-    
-    if p_message == 'dice':
-        return (str.random.randint(1,6))
-    
-    if p_message == '!help':
-        return '`This is help message that you can modify -TODO'
-    
+    if lowered == '':
+        return 'Blank input received'
+    elif 'hunt' in lowered:
+        return 'Let the hunt begin!'
+    elif 'dice' in lowered:
+        return  f'You rolled: {randint(1,6)}'
+    else:
+        return choice(['I do not understand...'],
+                      ['Try again'])
