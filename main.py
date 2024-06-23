@@ -1,7 +1,7 @@
-from typing import Final
+from typing import Final, Dict, Optional
 import os
 from dotenv import load_dotenv
-from discord import Intents, Client, Message, TextChannel
+from discord import Intents, Client, Message, TextChannel, HTTPException, utils
 from responses import get_response
 from constants import INTRO_MESSAGE
 import asyncio
@@ -18,22 +18,43 @@ intents: Intents = Intents.default()
 intents.message_content = True  # NOQA
 client: Client = Client(intents=intents)
 
+# Dictionary to store the last message sent for each command type
+last_messages: Dict[str, Dict[str, Optional[Message]]] = {}
+
 # STEP 2 MESSAGE FUNCTIONALITY
 async def send_message(message: Message, user_message: str) -> None:
-    if not user_message:
-        print('(Message was empty because intents were not enabled)')
-        return
-
+    global last_messages
     is_private = user_message[0] == '?'
     if is_private:
         user_message = user_message[1:]
 
+    command = user_message.split()[0] + " " + " ".join(user_message.split()[1:])  # Use the whole command string
+
     try:
         response: str = get_response(user_message)
+        print(f"Generated response: {response}")
+
+        # Initialize command in last_messages if not present
+        if command not in last_messages:
+            last_messages[command] = {"public": None, "private": None}
+
+        # Delete the last sent message if it exists for the specific command type
         if is_private:
-            await message.author.send(response)
+            if last_messages[command]["private"]:
+                try:
+                    print(f"Deleting previous private message for command {command}")
+                    await last_messages[command]["private"].delete()
+                except HTTPException as e:
+                    print(f"Failed to delete private message: {e}")
+            last_messages[command]["private"] = await message.author.send(response)
         else:
-            await message.channel.send(response)
+            if last_messages[command]["public"]:
+                try:
+                    print(f"Deleting previous public message for command {command}")
+                    await last_messages[command]["public"].delete()
+                except HTTPException as e:
+                    print(f"Failed to delete public message: {e}")
+            last_messages[command]["public"] = await message.channel.send(response)
     except Exception as e:
         print(e)
 
@@ -42,7 +63,7 @@ async def send_message(message: Message, user_message: str) -> None:
 async def on_ready() -> None:
     print(f'Hello {client.user}, RAGNAROK-HUNTER is ready')
     for guild in client.guilds:
-        channel: TextChannel = discord.utils.get(guild.text_channels, name='luitest')
+        channel: TextChannel = utils.get(guild.text_channels, name='luitest')
         if channel:
             await channel.send(INTRO_MESSAGE)
 

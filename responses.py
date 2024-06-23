@@ -1,6 +1,7 @@
 import csv
 from datetime import datetime, timedelta
 import re
+from random import randint, choice
 from constants import MVP_DATA_FILE, MVP_SCHED_FILE
 from fileUtils import read_mvp_data, read_mvp_sched, write_mvp_sched
 
@@ -10,6 +11,7 @@ def parse_add_command(user_input: str, mvp_data: dict):
     match = re.match(pattern, user_input)
     
     if not match:
+        print(f"Parse error: {user_input}")
         return None, "Invalid format. Expected: -mvp add {code} {currentDeathTime} {coordinateX} {coordinateY} {optional int}"
     
     code, death_time, x, y, optional_int = match.groups()[0], match.groups()[1], match.groups()[2], match.groups()[3], match.groups()[4]
@@ -74,11 +76,12 @@ def format_sched_for_display(mvp_sched):
     if not mvp_sched:
         return "MVP schedule is empty."
     
-    formatted_sched = "MVP Schedule:\n"
+    current_date = datetime.now().strftime("%b/%d/%Y")
+    formatted_sched = f"MVP Schedule for {current_date}:\n"
     formatted_sched += "MVP Code | Next Spawn Start | Next Spawn End | Location & Coordinates\n"
     formatted_sched += "-" * 75 + "\n"
     for row in mvp_sched:
-        location_and_coords = f"{row['Location']} ({row['Coordinates']})"
+        location_and_coords = f"{row['Location']}{row['Coordinates']}"
         formatted_sched += f"{row['MVP Code']} | {row['Next Spawn Start']} | {row['Next Spawn End']} | {location_and_coords}\n"
     return f"```\n{formatted_sched}\n```"
 
@@ -89,7 +92,7 @@ def get_response(user_input: str) -> str:
     if lowered == '':
         return 'Blank input received'
     elif lowered.startswith('-mvp'):
-        command = lowered[4:].strip()  # Extract the command after '-mvp'
+        command = lowered[4:].strip().split()[0]  # Extract the command after '-mvp'
         
         if command == 'hunt':
             return 'Let the hunt begin!'
@@ -97,7 +100,7 @@ def get_response(user_input: str) -> str:
             return f'You rolled: {randint(1, 6)}'
         elif command == 'codes':
             return format_data_for_display(mvp_data)
-        elif command.startswith('add'):
+        elif command == 'add':
             parsed_data, error = parse_add_command(user_input, mvp_data)
             if error:
                 return error
