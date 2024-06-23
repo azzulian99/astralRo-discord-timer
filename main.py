@@ -3,12 +3,21 @@ import os
 from dotenv import load_dotenv
 from discord import Intents, Client, Message, TextChannel, HTTPException, utils
 from responses import get_response
-from constants import INTRO_MESSAGE
+from constants import INTRO_MESSAGE, LOG_LEVEL, LOG_FILE, LOG_FORMAT, LOG_MAX_BYTES, LOG_BACKUP_COUNT
+import logging
+from logging.handlers import RotatingFileHandler
 import asyncio
 
 load_dotenv()
 TOKEN: Final[str] = os.getenv('DISCORD_TOKEN')
 print(TOKEN)
+
+# Configure logging
+logging.basicConfig(level=LOG_LEVEL, format=LOG_FORMAT)
+handler = RotatingFileHandler(LOG_FILE, maxBytes=LOG_MAX_BYTES, backupCount=LOG_BACKUP_COUNT)
+handler.setFormatter(logging.Formatter(LOG_FORMAT))
+logger = logging.getLogger()
+logger.addHandler(handler)
 
 # Introduction message for RAGNAROK-HUNTER
 print(INTRO_MESSAGE)
@@ -56,6 +65,7 @@ async def send_message(message: Message, user_message: str) -> None:
                     print(f"Failed to delete public message: {e}")
             last_messages[command]["public"] = await message.channel.send(response)
     except Exception as e:
+        logger.exception("Error sending message")
         print(e)
 
 # STEP 3 HANDLING STARTUP
