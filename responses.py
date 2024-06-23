@@ -3,154 +3,133 @@ from datetime import datetime, timedelta
 import re
 from random import randint, choice
 import logging
-from constants import MVP_DATA_FILE, MVP_SCHED_FILE, EXCEPTION_CODES
+from constants import MVP_DATA_FILE, MVP_SCHED_FILE, EXCEPTION_CODES, COORDINATE_BOUNDS
 from fileUtils import read_mvp_data, read_mvp_sched, write_mvp_sched
 
 logger = logging.getLogger(__name__)
 
-# Function to parse and validate the input for the -mvp add command
 def parse_add_command(user_input: str, mvp_data: dict):
     try:
-        # Special case for LHZ3, LHZ4, and THANA not requiring coordinates
-        if re.match(r'-mvp add (LHZ3|LHZ4|THANA)\s+(\d{2}:\d{2}(?::\d{2})?)', user_input):
-            pattern = r'-mvp add (LHZ3|LHZ4|THANA)\s+(\d{2}:\d{2}(?::\d{2})?)'
-            match = re.match(pattern, user_input)
-            
-            if not match:
-                logger.error("Parse error: %s", user_input)
-                return None, EXCEPTION_CODES['INVALID_FORMAT']
-            
-            code, death_time = match.groups()
-            x = y = None
-            optional_int = None
-        else:
-            pattern = r'-mvp add (\w+)\s+(\d{2}:\d{2}(?::\d{2})?)\s+(\d{1,3})\s+(\d{1,3})(?:\s+(\d+))?'
-            match = re.match(pattern, user_input)
-            
-            if not match:
-                logger.error("Parse error: %s", user_input)
-                return None, EXCEPTION_CODES['INVALID_FORMAT']
-            
-            code, death_time, x, y, optional_int = match.groups()[0], match.groups()[1], match.groups()[2], match.groups()[3], match.groups()[4]
-            x = int(x)
-            y = int(y)
-            optional_int = int(optional_int.strip()) if optional_int else None
-
-            if not (0 <= x < 500 and 0 <= y < 500):
-                return None, EXCEPTION_CODES['COORDINATES_OUT_OF_BOUNDS']
-        
-        if code not in mvp_data:
-            return None, EXCEPTION_CODES['INVALID_MVP_CODE']
-        
-        try:
-            if len(death_time) == 5:  # hh:mm format
-                death_time = datetime.strptime(death_time, '%H:%M')
-            elif len(death_time) == 8:  # hh:mm:ss format
-                death_time = datetime.strptime(death_time, '%H:%M:%S')
-            else:
-                return None, EXCEPTION_CODES['INVALID_TIME_FORMAT']
-        except ValueError:
-            return None, EXCEPTION_CODES['INVALID_TIME_FORMAT']
-        
+        code, death_time, x, y, optional_int = extract_command_parts(user_input, mvp_data)
+        validate_coordinates(x, y)
+        death_time = parse_death_time(death_time)
         return (code, death_time, x, y, optional_int), None
-    except Exception as e:
-        logger.exception("Unexpected error while parsing command: %s", user_input)
+    except ValueError as e:
+        logger.error("Error parsing command: %s", str(e))
         return None, str(e)
 
-# Function to add or update an entry in the MVP schedule
+def extract_command_parts(user_input: str, mvp_data: dict):
+    match = re.match(r'-mvp add (\w+)\s+(\d{2}:\d{2}(?::\d{2})?)(?:\s+(\d{1,3})\s+(\d{1,3})(?:\s+(\d+))?)?', user_input)
+    if not match:
+        raise ValueError(EXCEPTION_CODES['INVALID_FORMAT'])
+    code, death_time, x, y, optional_int = match.groups()
+    if code not in mvp_data:
+        raise ValueError(EXCEPTION_CODES['INVALID_MVP_CODE'])
+    x = int(x) if x else None
+    y = int(y) if y else None
+    optional_int = int(optional_int) if optional_int else None
+    return code, death_time, x, y, optional_int
+
+def validate_coordinates(x, y):
+    if x is not None and not (0 <= x < COORDINATE_BOUNDS):
+        raise ValueError(EXCEPTION_CODES['COORDINATES_OUT_OF_BOUNDS'])
+    if y is not None and not (0 <= y < COORDINATE_BOUNDS):
+        raise ValueError(EXCEPTION_CODES['COORDINATES_OUT_OF_BOUNDS'])
+
+def parse_death_time(death_time: str):
+    try:
+        return datetime.strptime(death_time, '%H:%M:%S') if ':' in death_time else datetime.strptime(death_time, '%H:%M')
+    except ValueError:
+        raise ValueError(EXCEPTION_CODES['INVALID_TIME_FORMAT'])
+
 def add_or_update_mvp_sched(parsed_data, mvp_data, mvp_sched_file):
     try:
-        code, death_time, x, y, optional_int = parsed_data
-        death_duration_start_str, death_duration_end_str, location = mvp_data[code]
-
-        death_duration_start = timedelta(hours=int(death_duration_start_str.split(':')[0]), minutes=int(death_duration_start_str.split(':')[1]))
-        death_duration_end = timedelta(hours=int(death_duration_end_str.split(':')[0]), minutes=int(death_duration_end_str.split(':')[1]))
-
-        now = datetime.now()
-        today_date = now.date()
-
-        next_spawn_start_datetime = datetime.combine(today_date, death_time.time()) + death_duration_start
-        next_spawn_end_datetime = datetime.combine(today_date, death_time.time()) + death_duration_end
-
-        next_spawn_start = next_spawn_start_datetime
-        next_spawn_end = next_spawn_end_datetime
-
-        new_entry = {
-            'MVP Code': code,
-            'Next Spawn Start': next_spawn_start.strftime('%Y-%m-%d %H:%M:%S'),
-            'Next Spawn End': next_spawn_end.strftime('%Y-%m-%d %H:%M:%S'),
-            'Location': location,
-            'Coordinates': f"{x} {y}" if x is not None and y is not None else ""
-        }
-        
+        new_entry = create_new_entry(parsed_data, mvp_data)
         mvp_sched = read_mvp_sched(mvp_sched_file)
-        
-        # Check if an entry with the same MVP Code exists and update it
-        updated = False
-        for entry in mvp_sched:
-            if entry['MVP Code'] == code:
-                entry.update(new_entry)
-                updated = True
-                break
-        
-        if not updated:
-            mvp_sched.append(new_entry)
-        
+        update_or_add_entry(mvp_sched, new_entry)
         write_mvp_sched(mvp_sched_file, mvp_sched)
-        
         return format_sched_for_display(mvp_sched)
     except Exception as e:
         logger.exception("Error adding or updating MVP schedule")
         return f"An error occurred: {str(e)}"
 
-# Function to format the MVP data for display in a code block
-def format_data_for_display(mvp_data):
-    formatted_data = "MVP Data:\n"
-    formatted_data += "MVP Code | Death Duration Start | Death Duration End | Location\n"
-    formatted_data += "-" * 65 + "\n"
-    for code, (start, end, location) in mvp_data.items():
-        formatted_data += f"{code} | {start} | {end} | {location}\n"
-    return f"```\n{formatted_data}\n```"
+def create_new_entry(parsed_data, mvp_data):
+    code, death_time, x, y, _ = parsed_data
+    death_duration_start, death_duration_end, location = get_death_durations_and_location(mvp_data, code)
+    next_spawn_start, next_spawn_end = calculate_next_spawns(death_time, death_duration_start, death_duration_end)
+    return {
+        'MVP Code': code,
+        'Next Spawn Start': next_spawn_start.strftime('%Y-%m-%d %H:%M:%S'),
+        'Next Spawn End': next_spawn_end.strftime('%Y-%m-%d %H:%M:%S'),
+        'Location': location,
+        'Coordinates': f"{x} {y}" if x is not None and y is not None else ""
+    }
 
-# Function to format the MVP schedule for display in a code block
+def get_death_durations_and_location(mvp_data, code):
+    death_duration_start_str, death_duration_end_str, location = mvp_data[code]
+    death_duration_start = timedelta(hours=int(death_duration_start_str.split(':')[0]), minutes=int(death_duration_start_str.split(':')[1]))
+    death_duration_end = timedelta(hours=int(death_duration_end_str.split(':')[0]), minutes=int(death_duration_end_str.split(':')[1]))
+    return death_duration_start, death_duration_end, location
+
+def calculate_next_spawns(death_time, death_duration_start, death_duration_end):
+    now = datetime.now()
+    today_date = now.date()
+    next_spawn_start = datetime.combine(today_date, death_time.time()) + death_duration_start
+    next_spawn_end = datetime.combine(today_date, death_time.time()) + death_duration_end
+    return next_spawn_start, next_spawn_end
+
+def update_or_add_entry(mvp_sched, new_entry):
+    for entry in mvp_sched:
+        if entry['MVP Code'] == new_entry['MVP Code']:
+            entry.update(new_entry)
+            return
+    mvp_sched.append(new_entry)
+
+def format_data_for_display(mvp_data):
+    try:
+        formatted_data = "\n".join(
+            [f"{code} | {start} | {end} | {location}" for code, (start, end, location) in mvp_data.items()]
+        )
+        return f"```\nMVP Data:\nMVP Code | Death Duration Start | Death Duration End | Location\n{'-' * 65}\n{formatted_data}\n```"
+    except Exception as e:
+        logger.exception("Error formatting MVP data for display")
+        return f"An error occurred: {str(e)}"
+
 def format_sched_for_display(mvp_sched):
     try:
         if not mvp_sched:
             return "MVP schedule is empty."
-        
-        # Sort the schedule by Next Spawn Start
         mvp_sched.sort(key=lambda x: datetime.strptime(x['Next Spawn Start'], '%Y-%m-%d %H:%M:%S'))
-        
-        current_datetime = datetime.now()
-        current_date = current_datetime.strftime("%b/%d/%Y")
+        current_date = datetime.now().strftime("%b/%d/%Y")
         formatted_sched = f"MVP Schedule for {current_date}:\n"
-        for index, row in enumerate(mvp_sched):
-            location_and_coords = f"{row['Location']} {row['Coordinates']}".strip()
-            next_spawn_start = datetime.strptime(row['Next Spawn Start'], '%Y-%m-%d %H:%M:%S')
-            next_spawn_end = datetime.strptime(row['Next Spawn End'], '%Y-%m-%d %H:%M:%S')
-            remarks = 'NEXT DAY' if next_spawn_start.date() > current_datetime.date() else 'EXPIRED' if current_datetime > next_spawn_end else ''
-            formatted_sched += f"{index + 1}: {row['MVP Code']} | {next_spawn_start.strftime('%H:%M:%S')} | {next_spawn_end.strftime('%H:%M:%S')} | {location_and_coords} | {remarks}\n"
+        formatted_sched += "\n".join(
+            [format_sched_row(index, row) for index, row in enumerate(mvp_sched)]
+        )
         return f"```\n{formatted_sched}\n```"
     except Exception as e:
         logger.exception("Error formatting MVP schedule for display")
         return f"An error occurred: {str(e)}"
 
-# Function to delete an entry from the MVP schedule
+def format_sched_row(index, row):
+    current_datetime = datetime.now()
+    location_and_coords = f"{row['Location']} {row['Coordinates']}".strip()
+    next_spawn_start = datetime.strptime(row['Next Spawn Start'], '%Y-%m-%d %H:%M:%S')
+    next_spawn_end = datetime.strptime(row['Next Spawn End'], '%Y-%m-%d %H:%M:%S')
+    remarks = 'NEXT DAY' if next_spawn_start.date() > current_datetime.date() else 'EXPIRED' if current_datetime > next_spawn_end else ''
+    return f"{index + 1}: {row['MVP Code']} | {next_spawn_start.strftime('%H:%M:%S')} | {next_spawn_end.strftime('%H:%M:%S')} | {location_and_coords} | {remarks}"
+
 def delete_from_mvp_sched(index, mvp_sched_file):
     try:
         mvp_sched = read_mvp_sched(mvp_sched_file)
         if index < 1 or index > len(mvp_sched):
             return EXCEPTION_CODES['INVALID_INDEX']
-        
         del mvp_sched[index - 1]
         write_mvp_sched(mvp_sched_file, mvp_sched)
-        
         return format_sched_for_display(mvp_sched)
     except Exception as e:
         logger.exception("Error deleting entry from MVP schedule")
         return f"An error occurred: {str(e)}"
 
-# Function to clear all entries from the MVP schedule
 def clear_mvp_sched(mvp_sched_file):
     try:
         with open(mvp_sched_file, 'w', newline='') as file:
@@ -163,69 +142,53 @@ def clear_mvp_sched(mvp_sched_file):
 
 def get_response(user_input: str) -> str:
     try:
-        # Remove extra spaces and tabs
         cleaned_input = " ".join(user_input.split())
-        lowered: str = cleaned_input.lower().strip()
+        lowered = cleaned_input.lower().strip()
         mvp_data = read_mvp_data(MVP_DATA_FILE)
-
         if lowered == '':
             return 'Blank input received'
-        elif lowered.startswith('-mvp'):
-            command_parts = lowered[4:].strip().split()
-            command = command_parts[0]
-            
-            if command == 'hunt':
-                return 'Let the hunt begin!'
-            elif command == 'dice':
-                return f'You rolled: {randint(1, 6)}'
-            elif command == 'codes':
-                return format_data_for_display(mvp_data)
-            elif command == 'add':
-                parsed_data, error = parse_add_command(cleaned_input, mvp_data)
-                if error:
-                    logger.error("Error parsing add command: %s", error)
-                    return f"Error: {error}"
-                return add_or_update_mvp_sched(parsed_data, mvp_data, MVP_SCHED_FILE)
-            elif command == 'sched':
-                mvp_sched = read_mvp_sched(MVP_SCHED_FILE)
-                return format_sched_for_display(mvp_sched)
-            elif command == 'delete':
-                if len(command_parts) < 2 or not command_parts[1].isdigit():
-                    return "Invalid format. Expected: -mvp delete {index}"
-                index = int(command_parts[1])
-                return delete_from_mvp_sched(index, MVP_SCHED_FILE)
-            elif command == 'clear':
-                return clear_mvp_sched(MVP_SCHED_FILE)
-            elif command == 'help':
-                return (
-                    "Available commands:\n"
-                    "-mvp hunt: Start the hunt.\n"
-                    "-mvp dice: Roll a dice.\n"
-                    "-mvp codes: Display MVP data.\n"
-                    "-mvp add: Add or update an MVP in the schedule.\n"
-                    "-mvp sched: Display the MVP schedule in a code block.\n"
-                    "-mvp delete {index}: Delete an entry from the schedule by index.\n"
-                    "-mvp clear: Clear all entries from the MVP schedule.\n"
-                    "-mvp help: Show this help message."
-                )
-            else:
-                return 'Invalid MVP command. Try -mvp hunt, -mvp dice, -mvp codes, -mvp add, -mvp sched, -mvp delete {index}, -mvp clear, or -mvp help.'
-        else:
-            return choice(['I do not understand...', 'Try again'])
+        if lowered.startswith('-mvp'):
+            return handle_mvp_command(lowered, cleaned_input, mvp_data)
+        return choice(['I do not understand...', 'Try again'])
     except Exception as e:
         logger.exception("Error processing response")
         return f"An error occurred: {str(e)}"
 
-# Example test cases
-if __name__ == "__main__":
-    print(get_response('-mvp hunt'))  # Expected: 'Let the hunt begin!'
-    print(get_response('-mvp dice'))  # Expected: 'You rolled: X' where X is a number between 1 and 6
-    print(get_response('-mvp codes'))  # Expected: List of MVP data
-    print(get_response('-mvp add VR 14:30 120 340 3'))  # Expected: Formatted MVP schedule after adding the entry
-    print(get_response('-mvp add LHZ3 14:30'))  # Expected: Formatted MVP schedule after adding the entry without coordinates
-    print(get_response('-mvp add THANA 14:30'))  # Expected: Formatted MVP schedule after adding the entry without coordinates
-    print(get_response('-mvp sched'))  # Expected: Formatted MVP schedule in a code block or "MVP schedule is empty."
-    print(get_response('-mvp delete 1'))  # Expected: Formatted MVP schedule after deleting the entry
-    print(get_response('-mvp clear'))  # Expected: All entries cleared successfully.
-    print(get_response('-mvp help'))  # Expected: Help message with available commands
-    print(get_response('random text'))  # Expected: Random response from ['I do not understand...', 'Try again']
+def handle_mvp_command(lowered, cleaned_input, mvp_data):
+    command_parts = lowered[4:].strip().split()
+    command = command_parts[0]
+    if command == 'hunt':
+        return 'Let the hunt begin!'
+    if command == 'dice':
+        return f'You rolled: {randint(1, 6)}'
+    if command == 'codes':
+        return format_data_for_display(mvp_data)
+    if command == 'add':
+        parsed_data, error = parse_add_command(cleaned_input, mvp_data)
+        if error:
+            logger.error("Error parsing add command: %s", error)
+            return f"Error: {error}"
+        return add_or_update_mvp_sched(parsed_data, mvp_data, MVP_SCHED_FILE)
+    if command == 'sched':
+        mvp_sched = read_mvp_sched(MVP_SCHED_FILE)
+        return format_sched_for_display(mvp_sched)
+    if command == 'delete':
+        if len(command_parts) < 2 or not command_parts[1].isdigit():
+            return "Invalid format. Expected: -mvp delete {index}"
+        index = int(command_parts[1])
+        return delete_from_mvp_sched(index, MVP_SCHED_FILE)
+    if command == 'clear':
+        return clear_mvp_sched(MVP_SCHED_FILE)
+    if command == 'help':
+        return (
+            "Available commands:\n"
+            "-mvp hunt: Start the hunt.\n"
+            "-mvp dice: Roll a dice.\n"
+            "-mvp codes: Display MVP data.\n"
+            "-mvp add: Add or update an MVP in the schedule.\n"
+            "-mvp sched: Display the MVP schedule in a code block.\n"
+            "-mvp delete {index}: Delete an entry from the schedule by index.\n"
+            "-mvp clear: Clear all entries from the MVP schedule.\n"
+            "-mvp help: Show this help message."
+        )
+    return 'Invalid MVP command. Try -mvp hunt, -mvp dice, -mvp codes, -mvp add, -mvp sched, -mvp delete {index}, -mvp clear, or -mvp help.'
