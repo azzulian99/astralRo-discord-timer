@@ -7,23 +7,36 @@ from fileUtils import read_mvp_data, read_mvp_sched, write_mvp_sched
 
 # Function to parse and validate the input for the -mvp add command
 def parse_add_command(user_input: str, mvp_data: dict):
-    pattern = r'-mvp add (\w+) (\d{2}:\d{2}(?::\d{2})?) (\d{1,3}) (\d{1,3})( \d+)?'
-    match = re.match(pattern, user_input)
-    
-    if not match:
-        print(f"Parse error: {user_input}")
-        return None, "Invalid format. Expected: -mvp add {code} {currentDeathTime} {coordinateX} {coordinateY} {optional int}"
-    
-    code, death_time, x, y, optional_int = match.groups()[0], match.groups()[1], match.groups()[2], match.groups()[3], match.groups()[4]
-    x = int(x)
-    y = int(y)
-    optional_int = int(optional_int.strip()) if optional_int else None
+    # Special case for LHZ3, LHZ4, and THANA not requiring coordinates
+    if re.match(r'-mvp add (LHZ3|LHZ4|THANA)\s+(\d{2}:\d{2}(?::\d{2})?)', user_input):
+        pattern = r'-mvp add (LHZ3|LHZ4|THANA)\s+(\d{2}:\d{2}(?::\d{2})?)'
+        match = re.match(pattern, user_input)
+        
+        if not match:
+            print(f"Parse error: {user_input}")
+            return None, "Invalid format. Expected: -mvp add LHZ3|LHZ4|THANA {currentDeathTime}"
+        
+        code, death_time = match.groups()
+        x = y = None
+        optional_int = None
+    else:
+        pattern = r'-mvp add (\w+)\s+(\d{2}:\d{2}(?::\d{2})?)\s+(\d{1,3})\s+(\d{1,3})(?:\s+(\d+))?'
+        match = re.match(pattern, user_input)
+        
+        if not match:
+            print(f"Parse error: {user_input}")
+            return None, "Invalid format. Expected: -mvp add {code} {currentDeathTime} {coordinateX} {coordinateY} {optional int}"
+        
+        code, death_time, x, y, optional_int = match.groups()[0], match.groups()[1], match.groups()[2], match.groups()[3], match.groups()[4]
+        x = int(x)
+        y = int(y)
+        optional_int = int(optional_int.strip()) if optional_int else None
+
+        if not (0 <= x < 500 and 0 <= y < 500):
+            return None, "Coordinates must be between 0 and 499."
     
     if code not in mvp_data:
         return None, "Invalid MVP code."
-    
-    if not (0 <= x < 500 and 0 <= y < 500):
-        return None, "Coordinates must be between 0 and 499."
     
     try:
         if len(death_time) == 5:  # hh:mm format
@@ -53,7 +66,7 @@ def add_or_update_mvp_sched(parsed_data, mvp_data, mvp_sched_file):
         'Next Spawn Start': next_spawn_start.strftime('%H:%M:%S'),
         'Next Spawn End': next_spawn_end.strftime('%H:%M:%S'),
         'Location': location,
-        'Coordinates': f"{x} {y}"
+        'Coordinates': f"{x} {y}" if x is not None and y is not None else ""
     }
     
     mvp_sched = read_mvp_sched(mvp_sched_file)
@@ -71,7 +84,7 @@ def add_or_update_mvp_sched(parsed_data, mvp_data, mvp_sched_file):
     
     write_mvp_sched(mvp_sched_file, mvp_sched)
     
-    return "Entry added or updated successfully."
+    return format_sched_for_display(mvp_sched)
 
 # Function to format the MVP data for display in a code block
 def format_data_for_display(mvp_data):
@@ -93,7 +106,7 @@ def format_sched_for_display(mvp_sched):
     current_date = datetime.now().strftime("%b/%d/%Y")
     formatted_sched = f"MVP Schedule for {current_date}:\n"
     for index, row in enumerate(mvp_sched):
-        location_and_coords = f"{row['Location']} {row['Coordinates']}"
+        location_and_coords = f"{row['Location']} {row['Coordinates']}".strip()
         formatted_sched += f"{index + 1}: {row['MVP Code']} | {row['Next Spawn Start']} | {row['Next Spawn End']} | {location_and_coords}\n"
     return f"```\n{formatted_sched}\n```"
 
@@ -105,7 +118,8 @@ def delete_from_mvp_sched(index, mvp_sched_file):
     
     del mvp_sched[index - 1]
     write_mvp_sched(mvp_sched_file, mvp_sched)
-    return "Entry deleted successfully."
+    
+    return format_sched_for_display(mvp_sched)
 
 # Function to clear all entries from the MVP schedule
 def clear_mvp_sched(mvp_sched_file):
@@ -115,7 +129,9 @@ def clear_mvp_sched(mvp_sched_file):
     return "All entries cleared successfully."
 
 def get_response(user_input: str) -> str:
-    lowered: str = user_input.lower().strip()
+    # Remove extra spaces and tabs
+    cleaned_input = " ".join(user_input.split())
+    lowered: str = cleaned_input.lower().strip()
     mvp_data = read_mvp_data(MVP_DATA_FILE)
 
     if lowered == '':
@@ -131,7 +147,7 @@ def get_response(user_input: str) -> str:
         elif command == 'codes':
             return format_data_for_display(mvp_data)
         elif command == 'add':
-            parsed_data, error = parse_add_command(user_input, mvp_data)
+            parsed_data, error = parse_add_command(cleaned_input, mvp_data)
             if error:
                 return error
             return add_or_update_mvp_sched(parsed_data, mvp_data, MVP_SCHED_FILE)
@@ -167,9 +183,11 @@ if __name__ == "__main__":
     print(get_response('-mvp hunt'))  # Expected: 'Let the hunt begin!'
     print(get_response('-mvp dice'))  # Expected: 'You rolled: X' where X is a number between 1 and 6
     print(get_response('-mvp codes'))  # Expected: List of MVP data
-    print(get_response('-mvp add VR 14:30 120 340 3'))  # Expected: Entry added or updated successfully.
+    print(get_response('-mvp add VR 14:30 120 340 3'))  # Expected: Formatted MVP schedule after adding the entry
+    print(get_response('-mvp add LHZ3 14:30'))  # Expected: Formatted MVP schedule after adding the entry without coordinates
+    print(get_response('-mvp add THANA 14:30'))  # Expected: Formatted MVP schedule after adding the entry without coordinates
     print(get_response('-mvp sched'))  # Expected: Formatted MVP schedule in a code block or "MVP schedule is empty."
-    print(get_response('-mvp delete 1'))  # Expected: Entry deleted successfully.
+    print(get_response('-mvp delete 1'))  # Expected: Formatted MVP schedule after deleting the entry
     print(get_response('-mvp clear'))  # Expected: All entries cleared successfully.
     print(get_response('-mvp help'))  # Expected: Help message with available commands
     print(get_response('random text'))  # Expected: Random response from ['I do not understand...', 'Try again']
