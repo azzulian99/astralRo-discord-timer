@@ -19,7 +19,7 @@ def parse_add_command(user_input: str, mvp_data: dict):
         return None, str(e)
 
 def extract_command_parts(user_input: str, mvp_data: dict):
-    pattern = r'-mvp add (\w+)\s+(\d{2}:\d{2}(?::\d{2})?)\s+(\d{1,3})\s+(\d{1,3})(?:\s+(\d+))?'
+    pattern = r'-mvp add (\w+)\s+(\d{1,2}:\d{2}(?::\d{2})?)\s+(\d{1,3})\s+(\d{1,3})(?:\s+(\d+))?'
     match = re.match(pattern, user_input)
     if not match:
         raise ValueError(EXCEPTION_CODES['INVALID_FORMAT'])
@@ -39,10 +39,14 @@ def validate_coordinates(x, y):
 
 def parse_death_time(death_time: str):
     try:
-        if len(death_time) == 5:  # hh:mm format
+        if len(death_time) == 5:  # h:mm format
             return datetime.strptime(death_time, '%H:%M')
+        elif len(death_time) == 7:  # h:mm:ss format
+            return datetime.strptime(death_time, '%H:%M:%S')
         elif len(death_time) == 8:  # hh:mm:ss format
             return datetime.strptime(death_time, '%H:%M:%S')
+        elif len(death_time) == 4:  # hh:mm format
+            return datetime.strptime(death_time, '%H:%M')
         else:
             raise ValueError()
     except ValueError:
