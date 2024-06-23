@@ -3,3 +3,6 @@ __pycache__/
 *$py.class
 __pycache__/bot.cpython-310.pyc
 __pycache__/responses.cpython-310.pyc
+
+# Ignore all log files
+*.log
