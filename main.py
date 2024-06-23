@@ -1,13 +1,17 @@
 from typing import Final
 import os
 from dotenv import load_dotenv
-from discord import Intents, Client, Message
+from discord import Intents, Client, Message, TextChannel
 from responses import get_response
+from constants import INTRO_MESSAGE
 import asyncio
 
 load_dotenv()
 TOKEN: Final[str] = os.getenv('DISCORD_TOKEN')
 print(TOKEN)
+
+# Introduction message for RAGNAROK-HUNTER
+print(INTRO_MESSAGE)
 
 # STEP 1 BOT SETUP
 intents: Intents = Intents.default()
@@ -36,7 +40,11 @@ async def send_message(message: Message, user_message: str) -> None:
 # STEP 3 HANDLING STARTUP
 @client.event
 async def on_ready() -> None:
-    print(f'Hello {client.user}, Astral Bot Timer is ready')
+    print(f'Hello {client.user}, RAGNAROK-HUNTER is ready')
+    for guild in client.guilds:
+        channel: TextChannel = discord.utils.get(guild.text_channels, name='luitest')
+        if channel:
+            await channel.send(INTRO_MESSAGE)
 
 # STEP 4 HANDLING INCOMING MESSAGES
 @client.event
