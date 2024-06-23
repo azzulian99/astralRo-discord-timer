@@ -37,8 +37,8 @@ def parse_add_command(user_input: str, mvp_data: dict):
     
     return (code, death_time, x, y, optional_int), None
 
-# Function to add an entry to the MVP schedule
-def add_to_mvp_sched(parsed_data, mvp_data, mvp_sched_file):
+# Function to add or update an entry in the MVP schedule
+def add_or_update_mvp_sched(parsed_data, mvp_data, mvp_sched_file):
     code, death_time, x, y, optional_int = parsed_data
     death_duration_start, death_duration_end, location = mvp_data[code]
     
@@ -57,10 +57,21 @@ def add_to_mvp_sched(parsed_data, mvp_data, mvp_sched_file):
     }
     
     mvp_sched = read_mvp_sched(mvp_sched_file)
-    mvp_sched.append(new_entry)
+    
+    # Check if an entry with the same MVP Code exists and update it
+    updated = False
+    for entry in mvp_sched:
+        if entry['MVP Code'] == code:
+            entry.update(new_entry)
+            updated = True
+            break
+    
+    if not updated:
+        mvp_sched.append(new_entry)
+    
     write_mvp_sched(mvp_sched_file, mvp_sched)
     
-    return "Entry added successfully."
+    return "Entry added or updated successfully."
 
 # Function to format the MVP data for display in a code block
 def format_data_for_display(mvp_data):
@@ -76,14 +87,32 @@ def format_sched_for_display(mvp_sched):
     if not mvp_sched:
         return "MVP schedule is empty."
     
+    # Sort the schedule by Next Spawn Start
+    mvp_sched.sort(key=lambda x: datetime.strptime(x['Next Spawn Start'], '%H:%M:%S'))
+    
     current_date = datetime.now().strftime("%b/%d/%Y")
     formatted_sched = f"MVP Schedule for {current_date}:\n"
-    formatted_sched += "MVP Code | Next Spawn Start | Next Spawn End | Location & Coordinates\n"
-    formatted_sched += "-" * 75 + "\n"
-    for row in mvp_sched:
-        location_and_coords = f"{row['Location']}{row['Coordinates']}"
-        formatted_sched += f"{row['MVP Code']} | {row['Next Spawn Start']} | {row['Next Spawn End']} | {location_and_coords}\n"
+    for index, row in enumerate(mvp_sched):
+        location_and_coords = f"{row['Location']} {row['Coordinates']}"
+        formatted_sched += f"{index + 1}: {row['MVP Code']} | {row['Next Spawn Start']} | {row['Next Spawn End']} | {location_and_coords}\n"
     return f"```\n{formatted_sched}\n```"
+
+# Function to delete an entry from the MVP schedule
+def delete_from_mvp_sched(index, mvp_sched_file):
+    mvp_sched = read_mvp_sched(mvp_sched_file)
+    if index < 1 or index > len(mvp_sched):
+        return "Invalid index."
+    
+    del mvp_sched[index - 1]
+    write_mvp_sched(mvp_sched_file, mvp_sched)
+    return "Entry deleted successfully."
+
+# Function to clear all entries from the MVP schedule
+def clear_mvp_sched(mvp_sched_file):
+    with open(mvp_sched_file, 'w', newline='') as file:
+        writer = csv.DictWriter(file, fieldnames=["MVP Code", "Next Spawn Start", "Next Spawn End", "Location", "Coordinates"])
+        writer.writeheader()
+    return "All entries cleared successfully."
 
 def get_response(user_input: str) -> str:
     lowered: str = user_input.lower().strip()
@@ -92,7 +121,8 @@ def get_response(user_input: str) -> str:
     if lowered == '':
         return 'Blank input received'
     elif lowered.startswith('-mvp'):
-        command = lowered[4:].strip().split()[0]  # Extract the command after '-mvp'
+        command_parts = lowered[4:].strip().split()
+        command = command_parts[0]
         
         if command == 'hunt':
             return 'Let the hunt begin!'
@@ -104,22 +134,31 @@ def get_response(user_input: str) -> str:
             parsed_data, error = parse_add_command(user_input, mvp_data)
             if error:
                 return error
-            return add_to_mvp_sched(parsed_data, mvp_data, MVP_SCHED_FILE)
+            return add_or_update_mvp_sched(parsed_data, mvp_data, MVP_SCHED_FILE)
         elif command == 'sched':
             mvp_sched = read_mvp_sched(MVP_SCHED_FILE)
             return format_sched_for_display(mvp_sched)
+        elif command == 'delete':
+            if len(command_parts) < 2 or not command_parts[1].isdigit():
+                return "Invalid format. Expected: -mvp delete {index}"
+            index = int(command_parts[1])
+            return delete_from_mvp_sched(index, MVP_SCHED_FILE)
+        elif command == 'clear':
+            return clear_mvp_sched(MVP_SCHED_FILE)
         elif command == 'help':
             return (
                 "Available commands:\n"
                 "-mvp hunt: Start the hunt.\n"
                 "-mvp dice: Roll a dice.\n"
                 "-mvp codes: Display MVP data.\n"
-                "-mvp add: Add an MVP to the schedule.\n"
+                "-mvp add: Add or update an MVP in the schedule.\n"
                 "-mvp sched: Display the MVP schedule in a code block.\n"
+                "-mvp delete {index}: Delete an entry from the schedule by index.\n"
+                "-mvp clear: Clear all entries from the MVP schedule.\n"
                 "-mvp help: Show this help message."
             )
         else:
-            return 'Invalid MVP command. Try -mvp hunt, -mvp dice, -mvp codes, -mvp add, -mvp sched, or -mvp help.'
+            return 'Invalid MVP command. Try -mvp hunt, -mvp dice, -mvp codes, -mvp add, -mvp sched, -mvp delete {index}, -mvp clear, or -mvp help.'
     else:
         return choice(['I do not understand...', 'Try again'])
 
@@ -128,7 +167,9 @@ if __name__ == "__main__":
     print(get_response('-mvp hunt'))  # Expected: 'Let the hunt begin!'
     print(get_response('-mvp dice'))  # Expected: 'You rolled: X' where X is a number between 1 and 6
     print(get_response('-mvp codes'))  # Expected: List of MVP data
-    print(get_response('-mvp add VR 14:30 120 340 3'))  # Expected: Entry added successfully.
+    print(get_response('-mvp add VR 14:30 120 340 3'))  # Expected: Entry added or updated successfully.
     print(get_response('-mvp sched'))  # Expected: Formatted MVP schedule in a code block or "MVP schedule is empty."
+    print(get_response('-mvp delete 1'))  # Expected: Entry deleted successfully.
+    print(get_response('-mvp clear'))  # Expected: All entries cleared successfully.
     print(get_response('-mvp help'))  # Expected: Help message with available commands
     print(get_response('random text'))  # Expected: Random response from ['I do not understand...', 'Try again']
