@@ -3,11 +3,3 @@ __pycache__/
 *$py.class
 __pycache__/bot.cpython-310.pyc
 __pycache__/responses.cpython-310.pyc
-
-# Environments
-.env
-.venv
-env/
-venv/
-env.bak/
-venv.bak/
