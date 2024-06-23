@@ -53,18 +53,24 @@ def parse_add_command(user_input: str, mvp_data: dict):
 # Function to add or update an entry in the MVP schedule
 def add_or_update_mvp_sched(parsed_data, mvp_data, mvp_sched_file):
     code, death_time, x, y, optional_int = parsed_data
-    death_duration_start, death_duration_end, location = mvp_data[code]
-    
-    death_duration_start = timedelta(minutes=int(death_duration_start.split(':')[1]), hours=int(death_duration_start.split(':')[0]))
-    death_duration_end = timedelta(minutes=int(death_duration_end.split(':')[1]), hours=int(death_duration_end.split(':')[0]))
-    
-    next_spawn_start = (death_time + death_duration_start).time()
-    next_spawn_end = (death_time + death_duration_end).time()
-    
+    death_duration_start_str, death_duration_end_str, location = mvp_data[code]
+
+    death_duration_start = timedelta(hours=int(death_duration_start_str.split(':')[0]), minutes=int(death_duration_start_str.split(':')[1]))
+    death_duration_end = timedelta(hours=int(death_duration_end_str.split(':')[0]), minutes=int(death_duration_end_str.split(':')[1]))
+
+    now = datetime.now()
+    today_date = now.date()
+
+    next_spawn_start_datetime = datetime.combine(today_date, death_time.time()) + death_duration_start
+    next_spawn_end_datetime = datetime.combine(today_date, death_time.time()) + death_duration_end
+
+    next_spawn_start = next_spawn_start_datetime
+    next_spawn_end = next_spawn_end_datetime
+
     new_entry = {
         'MVP Code': code,
-        'Next Spawn Start': next_spawn_start.strftime('%H:%M:%S'),
-        'Next Spawn End': next_spawn_end.strftime('%H:%M:%S'),
+        'Next Spawn Start': next_spawn_start.strftime('%Y-%m-%d %H:%M:%S'),
+        'Next Spawn End': next_spawn_end.strftime('%Y-%m-%d %H:%M:%S'),
         'Location': location,
         'Coordinates': f"{x} {y}" if x is not None and y is not None else ""
     }
@@ -101,13 +107,17 @@ def format_sched_for_display(mvp_sched):
         return "MVP schedule is empty."
     
     # Sort the schedule by Next Spawn Start
-    mvp_sched.sort(key=lambda x: datetime.strptime(x['Next Spawn Start'], '%H:%M:%S'))
+    mvp_sched.sort(key=lambda x: datetime.strptime(x['Next Spawn Start'], '%Y-%m-%d %H:%M:%S'))
     
-    current_date = datetime.now().strftime("%b/%d/%Y")
+    current_datetime = datetime.now()
+    current_date = current_datetime.strftime("%b/%d/%Y")
     formatted_sched = f"MVP Schedule for {current_date}:\n"
     for index, row in enumerate(mvp_sched):
         location_and_coords = f"{row['Location']} {row['Coordinates']}".strip()
-        formatted_sched += f"{index + 1}: {row['MVP Code']} | {row['Next Spawn Start']} | {row['Next Spawn End']} | {location_and_coords}\n"
+        next_spawn_start = datetime.strptime(row['Next Spawn Start'], '%Y-%m-%d %H:%M:%S')
+        next_spawn_end = datetime.strptime(row['Next Spawn End'], '%Y-%m-%d %H:%M:%S')
+        remarks = 'NEXT DAY' if next_spawn_start.date() > current_datetime.date() else 'EXPIRED' if current_datetime > next_spawn_end else ''
+        formatted_sched += f"{index + 1}: {row['MVP Code']} | {next_spawn_start.strftime('%H:%M:%S')} | {next_spawn_end.strftime('%H:%M:%S')} | {location_and_coords} | {remarks}\n"
     return f"```\n{formatted_sched}\n```"
 
 # Function to delete an entry from the MVP schedule
