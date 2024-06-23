@@ -44,8 +44,12 @@ async def on_message(message: Message) -> None:
     if message.author == client.user:
         return
 
-    username: str = str(message.author)
     user_message: str = message.content
+
+    if not user_message.startswith('-mvp'):
+        return
+
+    username: str = str(message.author)
     channel: str = str(message.channel)
 
     print(f'[{channel}] {username}: "{user_message}"')
