@@ -20,4 +20,4 @@ COORDINATE_BOUNDS = 500
 
 MVP_DATA_FILE = 'mvp_data.csv'
 MVP_SCHED_FILE = 'mvp_sched.csv'
-INTRO_MESSAGE = "Hello! I am RAGNAROK-HUNTER, your MVP timer bot."
+INTRO_MESSAGE = "Hello! I am (name TBD), your MVP bot timer."

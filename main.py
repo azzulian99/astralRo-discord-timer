@@ -98,9 +98,9 @@ async def send_message(message: Message, user_message: str) -> None:
 # STEP 3 HANDLING STARTUP
 @client.event
 async def on_ready() -> None:
-    print(f'Hello {client.user}, RAGNAROK-HUNTER is ready')
+    print(f'Hello {client.user}, mvp-bot-timer is ready')
     for guild in client.guilds:
-        channel: TextChannel = utils.get(guild.text_channels, name='luitest')
+        channel: TextChannel = utils.get(guild.text_channels, name='mvp-bot-timer')
         if channel:
             await channel.send(INTRO_MESSAGE)
 

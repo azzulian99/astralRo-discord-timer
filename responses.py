@@ -11,7 +11,8 @@ logger = logging.getLogger(__name__)
 def parse_add_command(user_input: str, mvp_data: dict):
     try:
         code, death_time, x, y, optional_int = extract_command_parts(user_input, mvp_data)
-        validate_coordinates(x, y)
+        if code not in ['LHZ3', 'LHZ4', 'THANA']:
+            validate_coordinates(x, y)
         death_time = parse_death_time(death_time)
         return (code, death_time, x, y, optional_int), None
     except ValueError as e:
@@ -19,7 +20,7 @@ def parse_add_command(user_input: str, mvp_data: dict):
         return None, str(e)
 
 def extract_command_parts(user_input: str, mvp_data: dict):
-    pattern = r'-mvp add (\w+)\s+(\d{1,2}:\d{2}(?::\d{2})?)\s+(\d{1,3})\s+(\d{1,3})(?:\s+(\d+))?'
+    pattern = r'-mvp add (\w+)\s+(\d{1,2}:\d{2}(?::\d{2})?)\s*(\d{1,3})?\s*(\d{1,3})?(?:\s+(\d+))?'
     match = re.match(pattern, user_input)
     if not match:
         raise ValueError(EXCEPTION_CODES['INVALID_FORMAT'])
