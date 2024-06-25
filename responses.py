@@ -125,9 +125,9 @@ def format_sched_row(index, row):
     current_datetime = datetime.now()
     location_and_coords = f"{row['Location']} {row['Coordinates']}".strip()
     next_spawn_start = datetime.strptime(row['Next Spawn Start'], '%Y-%m-%d %H:%M:%S')
-    next_spawn_end = datetime.strptime(row['Next Spawn End'], '%Y-%m-%d %H:%M:%S')
-    remarks = 'NEXT DAY' if next_spawn_start.date() > current_datetime.date() else 'EXPIRED' if current_datetime > next_spawn_end else ''
-    return f"{index + 1}: {row['MVP Code']} | {next_spawn_start.strftime('%H:%M:%S')} | {next_spawn_end.strftime('%H:%M:%S')} | {location_and_coords} | {remarks}"
+    next_spawn_start_formatted = next_spawn_start.strftime('%I:%M:%S %p')
+    remarks = 'NEXT DAY' if next_spawn_start.date() > current_datetime.date() else 'EXPIRED' if current_datetime > next_spawn_start else ''
+    return f"{index + 1}: {row['MVP Code']} | {next_spawn_start_formatted} | {location_and_coords} | {remarks}"
 
 def delete_from_mvp_sched(index, mvp_sched_file):
     try:
