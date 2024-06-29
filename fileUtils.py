@@ -1,5 +1,5 @@
 import csv
-from constants import MVP_DATA_FILE, MVP_SCHED_FILE
+from constants import MVP_DATA_FILE, MVP_SCHED_FILE, COORDINATE_BOUNDS, EXCEPTION_CODES
 
 def read_mvp_data(file_path=MVP_DATA_FILE):
     mvp_data = {}
@@ -23,3 +23,9 @@ def write_mvp_sched(file_path, data):
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(data)
+
+def validate_coordinates(x, y):
+    if x is not None and not (0 <= x < COORDINATE_BOUNDS):
+        raise ValueError(EXCEPTION_CODES['COORDINATES_OUT_OF_BOUNDS'])
+    if y is not None and not (0 <= y < COORDINATE_BOUNDS):
+        raise ValueError(EXCEPTION_CODES['COORDINATES_OUT_OF_BOUNDS'])       

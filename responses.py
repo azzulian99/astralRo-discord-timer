@@ -7,10 +7,13 @@ ph_tz = pytz.timezone('Asia/Manila')
 import re
 from random import randint, choice
 import logging
-from constants import MVP_DATA_FILE, MVP_SCHED_FILE, EXCEPTION_CODES, COORDINATE_BOUNDS
-from fileUtils import read_mvp_data, read_mvp_sched, write_mvp_sched
+from constants import MVP_DATA_FILE, MVP_SCHED_FILE, EXCEPTION_CODES
+from fileUtils import read_mvp_data, read_mvp_sched, write_mvp_sched, validate_coordinates
 
 logger = logging.getLogger(__name__)
+
+now = datetime.now(ph_tz)
+today_date = now.date()
 
 def parse_add_command(user_input: str, mvp_data: dict):
     try:
@@ -36,22 +39,17 @@ def extract_command_parts(user_input: str, mvp_data: dict):
     optional_int = int(optional_int) if optional_int else None
     return code, death_time, x, y, optional_int
 
-def validate_coordinates(x, y):
-    if x is not None and not (0 <= x < COORDINATE_BOUNDS):
-        raise ValueError(EXCEPTION_CODES['COORDINATES_OUT_OF_BOUNDS'])
-    if y is not None and not (0 <= y < COORDINATE_BOUNDS):
-        raise ValueError(EXCEPTION_CODES['COORDINATES_OUT_OF_BOUNDS'])
 
 def parse_death_time(death_time: str):
     try:
         if len(death_time) == 5:  # h:mm format
-            return datetime.strptime(death_time, '%H:%M')
+            return now.strptime(death_time, '%H:%M')
         elif len(death_time) == 7:  # h:mm:ss format
-            return datetime.strptime(death_time, '%H:%M:%S')
+            return now.strptime(death_time, '%H:%M:%S')
         elif len(death_time) == 8:  # hh:mm:ss format
-            return datetime.strptime(death_time, '%H:%M:%S')
+            return now.strptime(death_time, '%H:%M:%S')
         elif len(death_time) == 4:  # hh:mm format
-            return datetime.strptime(death_time, '%H:%M')
+            return now.strptime(death_time, '%H:%M')
         else:
             raise ValueError()
     except ValueError:
@@ -87,10 +85,9 @@ def get_death_durations_and_location(mvp_data, code):
     return death_duration_start, death_duration_end, location
 
 def calculate_next_spawns(death_time, death_duration_start, death_duration_end):
-    now = datetime.now(ph_tz)
-    today_date = now.date()
-    next_spawn_start = datetime.combine(today_date, death_time.time()) + death_duration_start
-    next_spawn_end = datetime.combine(today_date, death_time.time()) + death_duration_end
+    
+    next_spawn_start = now.combine(today_date, death_time.time()) + death_duration_start
+    next_spawn_end = now.combine(today_date, death_time.time()) + death_duration_end
     return next_spawn_start, next_spawn_end
 
 def update_or_add_entry(mvp_sched, new_entry):
@@ -114,9 +111,9 @@ def format_sched_for_display(mvp_sched):
     try:
         if not mvp_sched:
             return "MVP schedule is empty."
-        mvp_sched.sort(key=lambda x: datetime.strptime(x['Next Spawn Start'], '%Y-%m-%d %H:%M:%S'))
-        current_date = datetime.now(ph_tz).strftime("%b/%d/%Y")
-        formatted_sched = f"MVP Schedule for {current_date} (Current Time: {datetime.now(ph_tz).strftime('%I:%M:%S %p')}):\n"
+        mvp_sched.sort(key=lambda x: now.strptime(x['Next Spawn Start'], '%Y-%m-%d %H:%M:%S'))
+        current_date = now.strftime("%b/%d/%Y")
+        formatted_sched = f"MVP Schedule for {current_date} (Current Time: {now.strftime('%I:%M:%S %p')}):\n"
 
         formatted_sched += "\n".join(
             [format_sched_row(index, row) for index, row in enumerate(mvp_sched)]
@@ -127,9 +124,9 @@ def format_sched_for_display(mvp_sched):
         return f"An error occurred: {str(e)}"
 
 def format_sched_row(index, row):
-    current_datetime = datetime.now(ph_tz)
+    current_datetime = now;
     location_and_coords = f"{row['Location']} {row['Coordinates']}".strip()
-    next_spawn_start = datetime.strptime(row['Next Spawn Start'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=pytz.UTC)
+    next_spawn_start = now.strptime(row['Next Spawn Start'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=pytz.UTC)
     next_spawn_start_formatted = next_spawn_start.strftime('%I:%M:%S %p')
     remarks = 'NEXT DAY' if next_spawn_start.date() > current_datetime.date() else 'EXPIRED' if current_datetime > next_spawn_start else ''
     return f"{index + 1}: {row['MVP Code']} | {next_spawn_start_formatted} | {location_and_coords} | {remarks}"
