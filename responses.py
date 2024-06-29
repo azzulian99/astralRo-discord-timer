@@ -1,14 +1,13 @@
 import csv
 from datetime import datetime, timedelta, time
 import pytz
-
-ph_tz = pytz.timezone('Asia/Manila')
-
 import re
 from random import randint, choice
 import logging
 from constants import MVP_DATA_FILE, MVP_SCHED_FILE, EXCEPTION_CODES
 from fileUtils import read_mvp_data, read_mvp_sched, write_mvp_sched, validate_coordinates
+
+ph_tz = pytz.timezone('Asia/Manila')
 
 logger = logging.getLogger(__name__)
 now = datetime.now(ph_tz)
@@ -116,7 +115,7 @@ def format_sched_for_display(mvp_sched):
         mvp_sched.sort(key=lambda x: now.strptime(x['Next Spawn Start'], '%Y-%m-%d %H:%M:%S'))
         
 
-        formatted_sched = f"LOCAL: MVP Schedule for {current_date_formatted} (Current Time: {current_time_formatted}):\n"
+        formatted_sched = f"MVP Schedule for {current_date_formatted} (Current Time: {current_time_formatted}):\n"
 
         formatted_sched += "\n".join(
             [format_sched_row(index, row) for index, row in enumerate(mvp_sched)]
