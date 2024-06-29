@@ -116,7 +116,7 @@ def format_sched_for_display(mvp_sched):
             return "MVP schedule is empty."
         mvp_sched.sort(key=lambda x: datetime.strptime(x['Next Spawn Start'], '%Y-%m-%d %H:%M:%S'))
         current_date = datetime.now(ph_tz).strftime("%b/%d/%Y")
-        formatted_sched = f"MVP Schedule for {current_date} ({current_time_display}):\n"
+        formatted_sched = f"MVP Schedule for {current_date}:\n"
         formatted_sched += "\n".join(
             [format_sched_row(index, row) for index, row in enumerate(mvp_sched)]
         )
