@@ -7,6 +7,8 @@ from constants import INTRO_MESSAGE, LOG_LEVEL, LOG_FILE, LOG_FORMAT, LOG_MAX_BY
 import logging
 from logging.handlers import RotatingFileHandler
 import asyncio
+from datetime import datetime
+import pytz
 
 load_dotenv()
 TOKEN: Final[str] = os.getenv('DISCORD_TOKEN')
@@ -19,8 +21,11 @@ handler.setFormatter(logging.Formatter(LOG_FORMAT))
 logger = logging.getLogger()
 logger.addHandler(handler)
 
+# Philippine timezone
+ph_tz = pytz.timezone('Asia/Manila')
+
 # Introduction message for RAGNAROK-HUNTER
-print(INTRO_MESSAGE)
+#print(INTRO_MESSAGE)
 
 # STEP 1 BOT SETUP
 intents: Intents = Intents.default()

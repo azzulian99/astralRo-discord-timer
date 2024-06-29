@@ -1,5 +1,9 @@
 import csv
 from datetime import datetime, timedelta
+import pytz
+
+ph_tz = pytz.timezone('Asia/Manila')
+
 import re
 from random import randint, choice
 import logging
@@ -83,7 +87,7 @@ def get_death_durations_and_location(mvp_data, code):
     return death_duration_start, death_duration_end, location
 
 def calculate_next_spawns(death_time, death_duration_start, death_duration_end):
-    now = datetime.now()
+    now = datetime.now(ph_tz)
     today_date = now.date()
     next_spawn_start = datetime.combine(today_date, death_time.time()) + death_duration_start
     next_spawn_end = datetime.combine(today_date, death_time.time()) + death_duration_end
@@ -111,8 +115,8 @@ def format_sched_for_display(mvp_sched):
         if not mvp_sched:
             return "MVP schedule is empty."
         mvp_sched.sort(key=lambda x: datetime.strptime(x['Next Spawn Start'], '%Y-%m-%d %H:%M:%S'))
-        current_date = datetime.now().strftime("%b/%d/%Y")
-        formatted_sched = f"MVP Schedule for {current_date}:\n"
+        current_date = datetime.now(ph_tz).strftime("%b/%d/%Y")
+        formatted_sched = f"MVP Schedule for {current_date} ({current_time_display}):\n"
         formatted_sched += "\n".join(
             [format_sched_row(index, row) for index, row in enumerate(mvp_sched)]
         )
@@ -122,7 +126,7 @@ def format_sched_for_display(mvp_sched):
         return f"An error occurred: {str(e)}"
 
 def format_sched_row(index, row):
-    current_datetime = datetime.now()
+    current_datetime = datetime.now(ph_tz)
     location_and_coords = f"{row['Location']} {row['Coordinates']}".strip()
     next_spawn_start = datetime.strptime(row['Next Spawn Start'], '%Y-%m-%d %H:%M:%S')
     next_spawn_start_formatted = next_spawn_start.strftime('%I:%M:%S %p')
