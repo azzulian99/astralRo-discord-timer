@@ -1,5 +1,5 @@
 import csv
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 import pytz
 
 ph_tz = pytz.timezone('Asia/Manila')
@@ -11,9 +11,11 @@ from constants import MVP_DATA_FILE, MVP_SCHED_FILE, EXCEPTION_CODES
 from fileUtils import read_mvp_data, read_mvp_sched, write_mvp_sched, validate_coordinates
 
 logger = logging.getLogger(__name__)
-
 now = datetime.now(ph_tz)
-today_date = now.date()
+current_date = now.date()
+current_datetime = datetime.now(ph_tz)
+current_date_formatted = now.strftime("%b/%d/%Y")
+current_time_formatted = now.strftime('%I:%M:%S %p')
 
 def parse_add_command(user_input: str, mvp_data: dict):
     try:
@@ -86,8 +88,8 @@ def get_death_durations_and_location(mvp_data, code):
 
 def calculate_next_spawns(death_time, death_duration_start, death_duration_end):
     
-    next_spawn_start = now.combine(today_date, death_time.time()) + death_duration_start
-    next_spawn_end = now.combine(today_date, death_time.time()) + death_duration_end
+    next_spawn_start = now.combine(current_date, death_time.time()) + death_duration_start
+    next_spawn_end = now.combine(current_date, death_time.time()) + death_duration_end
     return next_spawn_start, next_spawn_end
 
 def update_or_add_entry(mvp_sched, new_entry):
@@ -112,8 +114,9 @@ def format_sched_for_display(mvp_sched):
         if not mvp_sched:
             return "MVP schedule is empty."
         mvp_sched.sort(key=lambda x: now.strptime(x['Next Spawn Start'], '%Y-%m-%d %H:%M:%S'))
-        current_date = now.strftime("%b/%d/%Y")
-        formatted_sched = f"MVP Schedule for {current_date} (Current Time: {now.strftime('%I:%M:%S %p')}):\n"
+        
+
+        formatted_sched = f"LOCAL: MVP Schedule for {current_date_formatted} (Current Time: {current_time_formatted}):\n"
 
         formatted_sched += "\n".join(
             [format_sched_row(index, row) for index, row in enumerate(mvp_sched)]
@@ -124,11 +127,17 @@ def format_sched_for_display(mvp_sched):
         return f"An error occurred: {str(e)}"
 
 def format_sched_row(index, row):
-    current_datetime = now;
     location_and_coords = f"{row['Location']} {row['Coordinates']}".strip()
-    next_spawn_start = now.strptime(row['Next Spawn Start'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=pytz.UTC)
+
+    rowVal = row['Next Spawn Start']
+    #print("rowVal:",rowVal)
+    
+    next_spawn_start = ph_tz.localize(datetime.strptime(rowVal, '%Y-%m-%d %H:%M:%S'))
     next_spawn_start_formatted = next_spawn_start.strftime('%I:%M:%S %p')
-    remarks = 'NEXT DAY' if next_spawn_start.date() > current_datetime.date() else 'EXPIRED' if current_datetime > next_spawn_start else ''
+
+    #print("next_spawn_start:",next_spawn_start)
+    remarks = 'NEXT DAY' if next_spawn_start.date() > current_date else 'EXPIRED' if now > next_spawn_start else ''
+
     return f"{index + 1}: {row['MVP Code']} | {next_spawn_start_formatted} | {location_and_coords} | {remarks}"
 
 def delete_from_mvp_sched(index, mvp_sched_file):
