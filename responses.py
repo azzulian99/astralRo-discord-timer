@@ -116,7 +116,8 @@ def format_sched_for_display(mvp_sched):
             return "MVP schedule is empty."
         mvp_sched.sort(key=lambda x: datetime.strptime(x['Next Spawn Start'], '%Y-%m-%d %H:%M:%S'))
         current_date = datetime.now(ph_tz).strftime("%b/%d/%Y")
-        formatted_sched = f"MVP Schedule for {current_date}:\n"
+        current_time = datetime.now(ph_tz).strftime("%H:%M:%S")
+        formatted_sched = f"MVP Schedule for {current_date} ({current_time}):\n"
         formatted_sched += "\n".join(
             [format_sched_row(index, row) for index, row in enumerate(mvp_sched)]
         )
@@ -128,7 +129,7 @@ def format_sched_for_display(mvp_sched):
 def format_sched_row(index, row):
     current_datetime = datetime.now(ph_tz)
     location_and_coords = f"{row['Location']} {row['Coordinates']}".strip()
-    next_spawn_start = datetime.strptime(row['Next Spawn Start'], '%Y-%m-%d %H:%M:%S')
+    next_spawn_start = datetime.strptime(row['Next Spawn Start'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=pytz.UTC)
     next_spawn_start_formatted = next_spawn_start.strftime('%I:%M:%S %p')
     remarks = 'NEXT DAY' if next_spawn_start.date() > current_datetime.date() else 'EXPIRED' if current_datetime > next_spawn_start else ''
     return f"{index + 1}: {row['MVP Code']} | {next_spawn_start_formatted} | {location_and_coords} | {remarks}"
