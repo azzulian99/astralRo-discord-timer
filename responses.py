@@ -42,6 +42,8 @@ def extract_command_parts(user_input: str, mvp_data: dict):
 
 
 def parse_death_time(death_time: str):
+    now = datetime.now(ph_tz)
+
     try:
         if len(death_time) == 5:  # h:mm format
             return now.strptime(death_time, '%H:%M')
@@ -86,6 +88,7 @@ def get_death_durations_and_location(mvp_data, code):
     return death_duration_start, death_duration_end, location
 
 def calculate_next_spawns(death_time, death_duration_start, death_duration_end):
+    now = datetime.now(ph_tz)
     
     next_spawn_start = now.combine(current_date, death_time.time()) + death_duration_start
     next_spawn_end = now.combine(current_date, death_time.time()) + death_duration_end
@@ -109,14 +112,14 @@ def format_data_for_display(mvp_data):
         return f"An error occurred: {str(e)}"
 
 def format_sched_for_display(mvp_sched):
+    now = datetime.now(ph_tz)
+    current_date_formatted = now.strftime("%b/%d/%Y")
+    current_time_formatted = now.strftime('%I:%M:%S %p')
     try:
         if not mvp_sched:
             return "MVP schedule is empty."
         mvp_sched.sort(key=lambda x: now.strptime(x['Next Spawn Start'], '%Y-%m-%d %H:%M:%S'))
-        
-
-        formatted_sched = f"MVP Schedule for {current_date_formatted} (Current Time: {current_time_formatted}):\n"
-
+        formatted_sched = f"LOCAL MVP Schedule for {current_date_formatted} (Current Time: {current_time_formatted}):\n"
         formatted_sched += "\n".join(
             [format_sched_row(index, row) for index, row in enumerate(mvp_sched)]
         )
@@ -127,16 +130,12 @@ def format_sched_for_display(mvp_sched):
 
 def format_sched_row(index, row):
     location_and_coords = f"{row['Location']} {row['Coordinates']}".strip()
-
     rowVal = row['Next Spawn Start']
     #print("rowVal:",rowVal)
-    
     next_spawn_start = ph_tz.localize(datetime.strptime(rowVal, '%Y-%m-%d %H:%M:%S'))
     next_spawn_start_formatted = next_spawn_start.strftime('%I:%M:%S %p')
-
     #print("next_spawn_start:",next_spawn_start)
     remarks = 'NEXT DAY' if next_spawn_start.date() > current_date else 'EXPIRED' if now > next_spawn_start else ''
-
     return f"{index + 1}: {row['MVP Code']} | {next_spawn_start_formatted} | {location_and_coords} | {remarks}"
 
 def delete_from_mvp_sched(index, mvp_sched_file):
