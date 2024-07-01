@@ -42,19 +42,25 @@ def extract_command_parts(user_input: str, mvp_data: dict):
 
 
 def parse_death_time(death_time: str):
-    now = datetime.now(ph_tz)
+    now = datetime.now(ph_tz).date()  # Get the current date
 
     try:
         if len(death_time) == 5:  # h:mm format
-            return now.strptime(death_time, '%H:%M')
+            parsed_time = datetime.strptime(death_time, '%H:%M').time()
         elif len(death_time) == 7:  # h:mm:ss format
-            return now.strptime(death_time, '%H:%M:%S')
+            parsed_time = datetime.strptime(death_time, '%H:%M:%S').time()
         elif len(death_time) == 8:  # hh:mm:ss format
-            return now.strptime(death_time, '%H:%M:%S')
+            parsed_time = datetime.strptime(death_time, '%H:%M:%S').time()
         elif len(death_time) == 4:  # hh:mm format
-            return now.strptime(death_time, '%H:%M')
+            parsed_time = datetime.strptime(death_time, '%H:%M').time()
         else:
             raise ValueError()
+        
+        # Combine the current date with the parsed time
+        combined_datetime = datetime.combine(now, parsed_time)
+        
+        # Localize the combined datetime to the Philippine timezone
+        return ph_tz.localize(combined_datetime)
     except ValueError:
         raise ValueError(EXCEPTION_CODES['INVALID_TIME_FORMAT'])
 

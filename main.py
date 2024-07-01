@@ -128,7 +128,6 @@ async def on_message(message: Message) -> None:
 
 # STEP 5 MAIN ENTRY POINT
 def main() -> None:
-    print('here')
     loop = asyncio.get_event_loop()
 
     try:
