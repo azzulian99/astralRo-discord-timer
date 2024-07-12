@@ -141,8 +141,9 @@ def format_sched_row(index, row):
     next_spawn_start = ph_tz.localize(datetime.strptime(rowVal, '%Y-%m-%d %H:%M:%S'))
     next_spawn_start_formatted = next_spawn_start.strftime('%I:%M:%S %p')
     #print("next_spawn_start:",next_spawn_start)
-    remarks = 'NEXT DAY' if next_spawn_start.date() > current_date else 'EXPIRED' if now > next_spawn_start else ''
-    return f"{index + 1}: {row['MVP Code']} | {next_spawn_start_formatted} | {location_and_coords} | {remarks}"
+    #remarks = 'NEXT DAY' if next_spawn_start.date() > current_date else 'EXPIRED' if now > next_spawn_start else ''
+    #return f"{index + 1}: {row['MVP Code']} | {next_spawn_start_formatted} | {location_and_coords} | {remarks}"
+    return f"{index + 1}: {row['MVP Code']} | {next_spawn_start_formatted} | {location_and_coords}"
 
 def delete_from_mvp_sched(index, mvp_sched_file):
     try:
