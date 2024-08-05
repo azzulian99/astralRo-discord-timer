@@ -29,10 +29,11 @@ def parse_add_command(user_input: str, mvp_data: dict):
 
 def extract_command_parts(user_input: str, mvp_data: dict):
     pattern = r'-mvp add (\w+)\s+(\d{1,2}:\d{2}(?::\d{2})?)\s*(\d{1,3})?\s*(\d{1,3})?(?:\s+(\d+))?'
-    match = re.match(pattern, user_input)
+    match = re.match(pattern, user_input.lower())
     if not match:
         raise ValueError(EXCEPTION_CODES['INVALID_FORMAT'])
     code, death_time, x, y, optional_int = match.groups()
+    code = code.upper()
     if code not in mvp_data:
         raise ValueError(EXCEPTION_CODES['INVALID_MVP_CODE'])
     x = int(x) if x else None
